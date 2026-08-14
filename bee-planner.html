@@ -1012,7 +1012,7 @@ function renderSettings(){
   const h=`
   <div class="scopehint">🗓️<div><b>These are your always-defaults.</b> For a one-off tweak, use the <b>“This week I want…”</b> card on the Plan tab instead.</div></div>
 
-  <div class="setgroup"><h4>📧 Account &amp; Sunday email</h4><div class="gd">Sign in with just your email — no password. Syncs Bee across your devices and powers the Sunday digest.</div>
+  <div class="setgroup"><h4>📧 Account &amp; Sunday email</h4><div class="gd">Sign in with just your email — no password. Syncs Bee across your devices and powers the Sunday digest. <b style="color:var(--gold)">Beta:</b> the login email can land in spam for now — check there.</div>
     ${ currentUser ? `
       <div class="ptarget" style="background:var(--green-soft);color:var(--green-deep)">✓ Signed in as <b>${escHtml(currentUser.email)}</b> — your plan now syncs across your devices.</div>
       ${toggle('digestOptIn',!!prefs.digestOptIn,'Email me every Sunday','Weekly plan + shopping list')}
