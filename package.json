@@ -1,0 +1,14 @@
+{
+  "name": "bee-telegram-bot",
+  "version": "1.0.0",
+  "description": "Bee Weekly Planner — Telegram bot. Sends a batch-cook weekly meal plan + shopping list for two (Kerala + world), every Sunday.",
+  "type": "commonjs",
+  "main": "bee-bot.js",
+  "scripts": {
+    "start": "node bee-bot.js"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0",
+    "node-cron": "^3.0.3"
+  }
+}
