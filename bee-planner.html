@@ -1063,6 +1063,7 @@ function aisleOf(name){const n=(name||'').toLowerCase();
   if(/chicken|beef|fish|salmon|prawn|mackerel|cod|mince|steak|\bmeat\b|tofu/.test(n)) return 'Meat, fish & tofu';
   if(/egg|yogurt|milk|cream|butter|feta|paneer/.test(n)) return 'Dairy & eggs';
   if(/bread|tortilla|oats|\brice\b|noodle|pasta|flour/.test(n)) return 'Bakery & grains';
+  if(/pesto|sauce|paste|tahini|miso|tamari|passata|canned|coconut milk|coconut \(frozen\)|tamarind|masala|kudampuli|olive oil|honey|nut butter/.test(n)) return 'Other';
   if(/tomato|onion|garlic|ginger|chilli|chili|spinach|cabbage|carrot|bean|pepper|zucchini|potato|lemon|lime|avocado|banana|apple|berr|broccoli|caulif|cucumber|herb|basil|mango|pumpkin|green|salad|lettuce|chayote|beet|shallot|sweet potato|pak choi|edamame|\bpea|fruit|coriander|mint|drumstick|gourd|leaf/.test(n)) return 'Produce';
   return 'Other';
 }
