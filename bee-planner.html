@@ -287,7 +287,7 @@ nav.tabs .tab .badge{position:absolute;transform:translate(14px,-4px);background
       <div class="mark">🐝</div>
       <div>
         <h1>Bee Weekly Planner</h1>
-        <div class="sub">Kerala + world kitchen · München · for two</div>
+        <div class="sub" id="brandSub">Kerala + world kitchen</div>
       </div>
     </div>
     <div class="diet" id="dietChips"></div>
@@ -403,7 +403,7 @@ const D=[
 {id:'l1',name:'Kerala fish curry + matta rice',sub:'kudampuli, cabbage thoran',cuis:'kerala',meal:'lunch',prot:'fish',pg:32,spice:2,mins:35,cook:'Simmer',batch:true,gf:true,gut:false,light:true,
  ing:[['Fish (fresh, mackerel/cod)',450,'g','g'],['Matta rice',200,'g','i'],['Cabbage',200,'g','g'],['Grated coconut (frozen)',60,'g','i'],['Shallots',80,'g','g']]},
 {id:'l2',name:'Light chicken curry + matta rice',sub:'coconut milk, beans thoran',cuis:'kerala',meal:'lunch',prot:'chicken',pg:34,spice:1,mins:35,cook:'Simmer',batch:true,gf:true,gut:false,light:true,
- ing:[['Chicken thigh',500,'g','g'],['Matta rice',200,'g','i'],['Coconut milk',150,'ml','i'],['Green beans',200,'g','g']]},
+ ing:[['Chicken thigh',500,'g','g'],['Matta rice',200,'g','i'],['Coconut milk',150,'ml','g'],['Green beans',200,'g','g']]},
 {id:'l3',name:'Egg roast + matta rice',sub:'cabbage-carrot thoran',cuis:'kerala',meal:'lunch',prot:'egg',pg:20,spice:1,mins:25,cook:'Pan',batch:true,gf:true,gut:false,light:true,
  ing:[['Eggs',6,'pc','g'],['Matta rice',200,'g','i'],['Onion',2,'pc','g'],['Cabbage',150,'g','g'],['Carrot',2,'pc','g']]},
 {id:'l4',name:'Rajma masala + rice',sub:'kidney beans, high-fiber',cuis:'indian',meal:'lunch',prot:'plant',pg:22,spice:1,mins:30,cook:'Simmer',batch:true,gf:true,gut:false,light:true,
@@ -413,7 +413,7 @@ const D=[
 {id:'l6',name:'Mediterranean chicken & chickpea traybake',sub:'peppers, lemon, olives',cuis:'med',meal:'lunch',prot:'chicken',pg:40,spice:0,mins:30,cook:'Oven',batch:true,gf:true,gut:true,light:true,
  ing:[['Chicken thigh',500,'g','g'],['Chickpeas (canned)',400,'g','g'],['Bell pepper',3,'pc','g'],['Lemon',1,'pc','g']]},
 {id:'l7',name:'Thai red chicken curry + rice',sub:'coconut, veg, aromatic',cuis:'thai',meal:'lunch',prot:'chicken',pg:33,spice:2,mins:30,cook:'Simmer',batch:true,gf:true,gut:false,light:true,
- ing:[['Chicken breast',500,'g','g'],['Coconut milk',200,'ml','i'],['Jasmine/basmati rice',200,'g','g'],['Mixed veg (pepper,broccoli)',250,'g','g']]},
+ ing:[['Chicken breast',500,'g','g'],['Coconut milk',200,'ml','g'],['Jasmine/basmati rice',200,'g','g'],['Mixed veg (pepper,broccoli)',250,'g','g']]},
 {id:'l8',name:'Chicken burrito bowl',sub:'rice, black beans, salsa',cuis:'mex',meal:'lunch',prot:'chicken',pg:36,spice:1,mins:25,cook:'Pan',batch:true,gf:true,gut:false,light:true,
  ing:[['Chicken breast',450,'g','g'],['Rice',200,'g','g'],['Black beans (canned)',400,'g','g'],['Tomato',2,'pc','g'],['Avocado',1,'pc','g']]},
 {id:'l9',name:'Salmon poke rice bowl',sub:'edamame, cucumber, tamari',cuis:'jpn',meal:'lunch',prot:'fish',pg:34,spice:0,mins:20,cook:'Assemble',batch:false,gf:true,gut:true,light:true,
@@ -736,6 +736,7 @@ function dayProtein(day){
 function renderChips(){
   const chips=[['#c0492f','Lactose-free'],['#3b6ea5','Gluten-light'],['#1f6f43','High-protein'],['#c98a0c','Batch-cook'],['#7a5cb5','Kerala + world']];
   $('#dietChips').innerHTML=chips.map(([c,t])=>`<span class="chip"><span class="dot" style="background:${c}"></span>${t}</span>`).join('');
+  const sub=$('#brandSub'); if(sub){const h=prefs.household||2; sub.textContent=`Kerala + world kitchen · for ${h===1?'one':h===2?'two':h}`;}
 }
 function renderSummary(){
   const onMeals=['bf','lunch','dinner'].filter(mealOn);
