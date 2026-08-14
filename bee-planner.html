@@ -311,7 +311,7 @@ nav.tabs .tab .badge{position:absolute;transform:translate(14px,-4px);background
     <div class="days" id="dayStrip"></div>
     <div id="lockbar"></div>
     <main id="mealHost"></main>
-    <div class="foot">Not feeling a suggestion? Tap <b>↻ Try another</b> until it's right, then <b>lock the week</b> for your shopping list.<br><b>♥</b> loves it (comes back) · <b>✕</b> skips it. Sized for <b>2 adults</b>.</div>
+    <div class="foot">Not feeling a suggestion? Tap <b>↻ Try another</b> until it's right, then <b>lock the week</b> for your shopping list.<br><b>♥</b> loves it (comes back) · <b>✕</b> skips it. Sized to your household &amp; portions.</div>
   </section>
 
   <section class="view" id="shopView">
@@ -325,7 +325,7 @@ nav.tabs .tab .badge{position:absolute;transform:translate(14px,-4px);background
         <p>Quantities already account for batch cooking — a dish eaten 3 days is bought for 3. Check off as you go.</p>
       </div>
       <div id="shopHost"></div>
-      <div class="foot">Estimates for <b>2 adults</b>. Curd/yogurt = <b>lactose-free</b>. Dry Indian goods: <b>order online</b> for quality, skip the frozen local store.</div>
+      <div class="foot">Quantities scale to your household &amp; portion size. Dry staples (rice, dal, spices) are easy to <b>order online</b> in bulk.</div>
     </main>
   </section>
 
@@ -556,9 +556,9 @@ const DEFAULT_PREFS={
   cookTime:'minimal',       // minimal | moderate | more
   preferredShop:'REWE',     // REWE | Edeka | Aldi/Lidl | Any
   goalW:{protein:75,light:70,variety:60,waste:30},   // 0-100 sliders
-  lactoseFree:true, glutenLight:true, lessMasala:true, gutFriendly:false,
+  lactoseFree:false, glutenLight:false, lessMasala:false, gutFriendly:false,
   lowerCarb:false, moreFiber:false, omega3:false,
-  noBeef:false, noPork:true, noFish:false, noShellfish:false, noEgg:false, noTofu:false,
+  noBeef:false, noPork:false, noFish:false, noShellfish:false, noEgg:false, noTofu:false,
   goal:'maintain',          // lose | maintain | gain
   activity:'moderate',      // low | moderate | high
   weightKg:'', targetKg:'',
@@ -734,9 +734,17 @@ function dayProtein(day){
 
 /* ---------- render: chips + summary + levelup ---------- */
 function renderChips(){
-  const chips=[['#c0492f','Lactose-free'],['#3b6ea5','Gluten-light'],['#1f6f43','High-protein'],['#c98a0c','Batch-cook'],['#7a5cb5','Kerala + world']];
+  const chips=[];
+  if(prefs.lactoseFree)chips.push(['#c0492f','Lactose-free']);
+  if(prefs.glutenLight)chips.push(['#3b6ea5','Gluten-light']);
+  if(prefs.lessMasala)chips.push(['#c98a0c','Less masala']);
+  if(prefs.gutFriendly)chips.push(['#1f6f43','Gut-friendly']);
+  if(prefs.lowerCarb)chips.push(['#7a5cb5','Lower-carb']);
+  if(prefs.goalW&&(prefs.goalW.protein||0)>=60)chips.push(['#3b6ea5','High-protein']);
+  chips.push(['#c98a0c','Batch-cook']);
+  chips.push(['#7a5cb5', prefs.cuisineMix==='kerala'?'Kerala-focused':prefs.cuisineMix==='wide'?'World kitchen':'Kerala + world']);
   $('#dietChips').innerHTML=chips.map(([c,t])=>`<span class="chip"><span class="dot" style="background:${c}"></span>${t}</span>`).join('');
-  const sub=$('#brandSub'); if(sub){const h=prefs.household||2; sub.textContent=`Kerala + world kitchen · for ${h===1?'one':h===2?'two':h}`;}
+  const sub=$('#brandSub'); if(sub){const h=prefs.household||2; const cz=prefs.cuisineMix==='kerala'?'Kerala kitchen':prefs.cuisineMix==='wide'?'World kitchen':'Kerala + world kitchen'; sub.textContent=`${cz} · for ${h===1?'one':h===2?'two':h}`;}
 }
 function renderSummary(){
   const onMeals=['bf','lunch','dinner'].filter(mealOn);
@@ -761,7 +769,7 @@ function renderLevelup(){
   const tips=[
     `<b>Juno's nudge:</b> ~${Math.round((()=>{let t=0;for(let i=0;i<7;i++)t+=dayProtein(i);return t/7})())}g protein a day this week — strong for training. Add a handful of nuts on lighter days.`,
     `<b>Remy's pick:</b> a new cuisine landed in your week — cook the adventurous one on a weekend when you've more time.`,
-    `<b>Otto says:</b> buy fish & veg fresh at REWE/Edeka; order matta rice, dal & spices online in bulk — skip the frozen local store.`,
+    `<b>Otto says:</b> buy fish & veg fresh at ${prefs.preferredShop&&prefs.preferredShop!=='Any'?prefs.preferredShop:'your supermarket'}; order pantry staples (rice, dal, spices) online in bulk.`,
     `<b>Batch smart:</b> cook the big-protein anchor first; it carries 2–3 lunches so weekdays are just reheat + a quick salad.`,
   ];
   $('#levelup').innerHTML=`🌱<div>${tips[(sunday.getDate())%tips.length]}</div>`;
@@ -1032,7 +1040,7 @@ function storeMeta(){
   const gSub=shop==='Any'?'fresh, meat, fish, veg, LF dairy':`your preferred shop — fresh, meat, fish, veg, LF dairy`;
   return {
     g:{ic:'🛒',name:gName,sub:gSub},
-    i:{ic:'📦',name:'Indian pantry (order online)',sub:'shelf-stable only — better quality than the frozen local store'},
+    i:{ic:'📦',name:'Indian pantry (order online)',sub:'shelf-stable staples — easy to order online in bulk'},
     p:{ic:'🫙',name:'Pantry check',sub:'staples you likely already have'},
   };
 }
