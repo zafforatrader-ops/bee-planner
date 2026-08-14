@@ -600,20 +600,30 @@ function currentSunday(){const n=new Date();const d=new Date(n.getFullYear(),n.g
 function fmtRange(sun){const sat=new Date(sun);sat.setDate(sat.getDate()+6);const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return `${mo[sun.getMonth()]} ${sun.getDate()} – ${mo[sat.getMonth()]} ${sat.getDate()}`;}
 
 /* ---------- state ---------- */
-let state=load(LS.plan,null);
-const weekKey=currentSunday().toISOString().slice(0,10);
-if(!state || state.weekKey!==weekKey){
-  if(state&&state.plan){prevAnchors=planAnchorIds(state.plan);save(LS.prev,prevAnchors);}
-  state={weekKey,plan:generatePlan(),approved:false,weeklyMods:{}};save(LS.plan,state);
+// local (not UTC) YYYY-MM-DD so the week key never slips a day across timezones
+function ymd(d){const m=String(d.getMonth()+1).padStart(2,'0');const day=String(d.getDate()).padStart(2,'0');return `${d.getFullYear()}-${m}-${day}`;}
+const weekKey=ymd(currentSunday());
+// single source of truth for a brand-new week — ALWAYS has every field
+function freshWeek(mods){return {weekKey,plan:generatePlan(mods),approved:false,weeklyMods:mods||{},skips:[],cookDays:{}};}
+// guarantee every field exists on any loaded/older state (no crashes)
+function normalizeState(s){
+  if(!s||!s.plan) return freshWeek();
+  if(s.approved===undefined)s.approved=false;
+  if(!s.weeklyMods)s.weeklyMods={};
+  if(!Array.isArray(s.skips))s.skips=[];
+  if(!s.cookDays||typeof s.cookDays!=='object'||Array.isArray(s.cookDays))s.cookDays={};
+  return s;
 }
-if(state.approved===undefined)state.approved=false;
-if(!state.weeklyMods)state.weeklyMods={};
-if(!state.skips)state.skips=[];           // "meal:day" the user is eating out / skipping
-if(!state.cookDays)state.cookDays={};     // "meal:segStart" -> chosen cook day index
+let state=normalizeState(load(LS.plan,null));
+if(state.weekKey!==weekKey){
+  if(state.plan){prevAnchors=planAnchorIds(state.plan);save(LS.prev,prevAnchors);}
+  state=freshWeek();
+}
+save(LS.plan,state);
 function segKey(m,seg){return m+':'+seg.start;}
-function cookDayOf(m,seg){const v=state.cookDays[segKey(m,seg)];return (v==null||v<seg.start||v>=seg.start+seg.len)?seg.start:v;}
-function isSkipped(m,day){return state.skips.includes(m+':'+day);}
-function toggleSkip(m,day){const k=m+':'+day;const i=state.skips.indexOf(k);if(i>=0)state.skips.splice(i,1);else state.skips.push(k);save(LS.plan,state);}
+function cookDayOf(m,seg){const cd=state.cookDays||(state.cookDays={});const v=cd[segKey(m,seg)];return (v==null||v<seg.start||v>=seg.start+seg.len)?seg.start:v;}
+function isSkipped(m,day){return (state.skips||[]).includes(m+':'+day);}
+function toggleSkip(m,day){if(!state.skips)state.skips=[];const k=m+':'+day;const i=state.skips.indexOf(k);if(i>=0)state.skips.splice(i,1);else state.skips.push(k);save(LS.plan,state);}
 let activeDay=new Date().getDay();
 const sunday=currentSunday();
 
@@ -1010,7 +1020,7 @@ function renderSettings(){
 }
 $('#applyPrefs').onclick=()=>{
   prevAnchors=planAnchorIds(state.plan);save(LS.prev,prevAnchors);
-  state={weekKey,plan:generatePlan()};save(LS.plan,state);
+  state=freshWeek();save(LS.plan,state);
   shopChecked={};save(LS.shop,shopChecked);
   renderAll();showView('plan');
 };
@@ -1019,7 +1029,7 @@ $('#resetPrefs').onclick=()=>{prefs=Object.assign({},DEFAULT_PREFS);savePrefs();
 /* ---------- regenerate + tabs ---------- */
 $('#regen').onclick=()=>{
   prevAnchors=planAnchorIds(state.plan);save(LS.prev,prevAnchors);
-  state={weekKey,plan:generatePlan()};save(LS.plan,state);
+  state=freshWeek();save(LS.plan,state);
   shopChecked={};save(LS.shop,shopChecked);
   renderAll();$('#summary').scrollIntoView({behavior:'smooth',block:'start'});
 };
@@ -1077,7 +1087,7 @@ function showOnboard(){
   o.querySelectorAll('[data-tog]').forEach(sw=>sw.onclick=()=>{prefs[sw.dataset.tog]=!prefs[sw.dataset.tog];savePrefs();sw.classList.toggle('on',prefs[sw.dataset.tog]);});
   $('#obStart').onclick=()=>{
     save(LS.onboarded,true);
-    state={weekKey,plan:generatePlan(),approved:false,weeklyMods:{}};save(LS.plan,state);
+    state=freshWeek();save(LS.plan,state);
     o.style.display='none'; renderAll();
   };
 }
