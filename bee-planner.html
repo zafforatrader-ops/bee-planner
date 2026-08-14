@@ -50,8 +50,13 @@ header.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--b
 .brand h1{font-family:var(--font-display);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em}
 .brand .sub{font-size:11.5px;color:var(--muted);margin-top:1px;letter-spacing:.02em}
 .weekrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
-.weekrow .wk{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.wknav{display:flex;align-items:center;gap:8px;min-width:0}
+.weekrow .wk{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .weekrow .wk b{color:var(--ink);font-weight:600}
+.wkarrow{width:28px;height:28px;flex:0 0 auto;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:17px;line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform .08s,border-color .15s,opacity .15s}
+.wkarrow:hover:not(:disabled){border-color:var(--green);color:var(--green)}
+.wkarrow:active:not(:disabled){transform:scale(.9)}
+.wkarrow:disabled{opacity:.35;cursor:default}
 .btn{font-family:var(--font-body);font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 13px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:transform .08s,background .15s,border-color .15s}
 .btn:hover{border-color:var(--green)}
 .btn:active{transform:scale(.96)}
@@ -263,10 +268,14 @@ nav.tabs .tab .badge{position:absolute;transform:translate(14px,-4px);background
     </div>
     <div class="diet" id="dietChips"></div>
     <div class="weekrow">
-      <div class="wk" id="wkLabel">—</div>
-      <button class="btn primary" id="regen">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
-        New week
+      <div class="wknav">
+        <button class="wkarrow" id="wkPrev" aria-label="Previous week">‹</button>
+        <div class="wk" id="wkLabel">—</div>
+        <button class="wkarrow" id="wkNext" aria-label="Next week">›</button>
+      </div>
+      <button class="btn primary" id="regen" title="Generate new suggestions for this week">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+        New ideas
       </button>
     </div>
   </header>
@@ -475,7 +484,7 @@ const mealPool=m=>D.filter(d=>d.meal===m);
 const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 /* ---------- storage ---------- */
-const LS={ratings:'bwp_ratings_v2',plan:'bwp_plan_v2',prev:'bwp_prev_v2',shop:'bwp_shop_v2',prefs:'bwp_prefs_v2',onboarded:'bwp_onboarded_v2'};
+const LS={ratings:'bwp_ratings_v2',plan:'bwp_plan_v2',prev:'bwp_prev_v2',shop:'bwp_shop_v2',prefs:'bwp_prefs_v2',onboarded:'bwp_onboarded_v2',weeks:'bwp_weeks_v2'};
 const load=(k,f)=>{try{return JSON.parse(localStorage.getItem(k))??f}catch(e){return f}};
 const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 let ratings=load(LS.ratings,{});
@@ -599,33 +608,62 @@ function planAnchorIds(p){return [...p.bf,...p.lunch,...p.dinner].map(s=>s.id);}
 function currentSunday(){const n=new Date();const d=new Date(n.getFullYear(),n.getMonth(),n.getDate());d.setDate(d.getDate()-d.getDay());return d;}
 function fmtRange(sun){const sat=new Date(sun);sat.setDate(sat.getDate()+6);const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return `${mo[sun.getMonth()]} ${sun.getDate()} – ${mo[sat.getMonth()]} ${sat.getDate()}`;}
 
-/* ---------- state ---------- */
+/* ---------- state (multi-week: navigate this week / next week / …) ---------- */
 // local (not UTC) YYYY-MM-DD so the week key never slips a day across timezones
 function ymd(d){const m=String(d.getMonth()+1).padStart(2,'0');const day=String(d.getDate()).padStart(2,'0');return `${d.getFullYear()}-${m}-${day}`;}
-const weekKey=ymd(currentSunday());
-// single source of truth for a brand-new week — ALWAYS has every field
-function freshWeek(mods){return {weekKey,plan:generatePlan(mods),approved:false,weeklyMods:mods||{},skips:[],cookDays:{}};}
-// guarantee every field exists on any loaded/older state (no crashes)
-function normalizeState(s){
-  if(!s||!s.plan) return freshWeek();
+const MAX_AHEAD=8;
+function offsetSunday(o){const d=currentSunday();d.setDate(d.getDate()+o*7);return d;}
+function offsetKey(o){return ymd(offsetSunday(o));}
+
+let weeks=load(LS.weeks,{});                 // { weekKey: weekState }
+// migrate a single old saved week, if present, into the map
+(function(){const old=load(LS.plan,null);if(old&&old.plan&&old.weekKey&&!weeks[old.weekKey])weeks[old.weekKey]=old;})();
+
+let weekOffset=0;                            // 0 = this week, 1 = next week, …
+let sunday=offsetSunday(0);                  // Sunday of the currently-viewed week
+let viewKey=offsetKey(0);
+
+// a brand-new week — ALWAYS has every field
+function blankWeek(key,mods){return {weekKey:key,plan:generatePlan(mods),approved:false,weeklyMods:mods||{},skips:[],cookDays:{}};}
+function freshWeek(mods){return blankWeek(viewKey,mods);}   // rebuild the viewed week
+function normalizeState(s,key){
+  if(!s||!s.plan) return blankWeek(key);
   if(s.approved===undefined)s.approved=false;
   if(!s.weeklyMods)s.weeklyMods={};
   if(!Array.isArray(s.skips))s.skips=[];
   if(!s.cookDays||typeof s.cookDays!=='object'||Array.isArray(s.cookDays))s.cookDays={};
+  s.weekKey=key;
   return s;
 }
-let state=normalizeState(load(LS.plan,null));
-if(state.weekKey!==weekKey){
-  if(state.plan){prevAnchors=planAnchorIds(state.plan);save(LS.prev,prevAnchors);}
-  state=freshWeek();
+function ensureWeek(o){
+  const k=offsetKey(o);
+  if(!weeks[k]){
+    const pk=offsetKey(o-1), saved=prevAnchors;         // keep new week fresh vs the prior one
+    if(weeks[pk]&&weeks[pk].plan)prevAnchors=planAnchorIds(weeks[pk].plan);
+    weeks[k]=blankWeek(k);
+    prevAnchors=saved;
+  }
+  weeks[k]=normalizeState(weeks[k],k);
+  return weeks[k];
 }
-save(LS.plan,state);
+function saveWeek(){if(state)weeks[state.weekKey]=state;save(LS.weeks,weeks);}
+function setWeek(o){
+  saveWeek();
+  o=Math.max(0,Math.min(MAX_AHEAD,o));
+  weekOffset=o; sunday=offsetSunday(o); viewKey=offsetKey(o);
+  state=ensureWeek(o);
+  activeDay=(o===0)?new Date().getDay():0;
+  saveWeek(); renderAll();
+  if(document.querySelector('#shopView').classList.contains('active'))renderShopping();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+let state=ensureWeek(0); saveWeek();
+let activeDay=new Date().getDay();
 function segKey(m,seg){return m+':'+seg.start;}
 function cookDayOf(m,seg){const cd=state.cookDays||(state.cookDays={});const v=cd[segKey(m,seg)];return (v==null||v<seg.start||v>=seg.start+seg.len)?seg.start:v;}
 function isSkipped(m,day){return (state.skips||[]).includes(m+':'+day);}
-function toggleSkip(m,day){if(!state.skips)state.skips=[];const k=m+':'+day;const i=state.skips.indexOf(k);if(i>=0)state.skips.splice(i,1);else state.skips.push(k);save(LS.plan,state);}
-let activeDay=new Date().getDay();
-const sunday=currentSunday();
+function toggleSkip(m,day){if(!state.skips)state.skips=[];const k=m+':'+day;const i=state.skips.indexOf(k);if(i>=0)state.skips.splice(i,1);else state.skips.push(k);saveWeek();}
 
 /* ---------- helpers ---------- */
 const $=s=>document.querySelector(s);
@@ -668,26 +706,33 @@ function renderLevelup(){
   ];
   $('#levelup').innerHTML=`🌱<div>${tips[(sunday.getDate())%tips.length]}</div>`;
 }
-function renderWeekLabel(){$('#wkLabel').innerHTML=`<b>This week</b> · ${fmtRange(sunday)}`;}
+function weekName(o){return o===0?'This week':o===1?'Next week':`In ${o} weeks`;}
+function renderWeekLabel(){
+  $('#wkLabel').innerHTML=`<b>${weekName(weekOffset)}</b> · ${fmtRange(sunday)}`;
+  const p=$('#wkPrev'),n=$('#wkNext');
+  if(p)p.disabled=weekOffset<=0;
+  if(n)n.disabled=weekOffset>=MAX_AHEAD;
+}
 
 const WISHES=[['veg','🥬 More veg'],['protein','💪 More protein'],['quick','⚡ Quick week'],['newcuisine','🌍 Try new cuisines'],['comfort','🥥 Comfort / Kerala'],['lighter','🪶 Lighter']];
 function renderWish(){
   const m=state.weeklyMods||{};
   const chips=WISHES.map(([k,l])=>`<button class="wchip ${m[k]?'on':''}" data-wish="${k}">${l}</button>`).join('');
   const any=WISHES.some(([k])=>m[k]);
+  const wn=weekName(weekOffset).toLowerCase();
   $('#weekwish').innerHTML=`<div class="wish">
-    <div class="wh">🎯 This week I want…</div>
-    <div class="wsub">Just for this week — your always-settings stay as they are.</div>
+    <div class="wh">🎯 ${weekName(weekOffset)} I want…</div>
+    <div class="wsub">Just for ${wn} — your always-settings stay as they are.</div>
     <div class="wishchips">${chips}</div>
-    <button class="btn primary wapply ${any?'show':''}" id="wishApply">Rebuild this week with these</button>
+    <button class="btn primary wapply ${any?'show':''}" id="wishApply">Rebuild ${wn} with these</button>
   </div>`;
   $('#weekwish').querySelectorAll('[data-wish]').forEach(b=>b.onclick=()=>{
-    const k=b.dataset.wish; state.weeklyMods[k]=!state.weeklyMods[k]; save(LS.plan,state); renderWish();
+    const k=b.dataset.wish; state.weeklyMods[k]=!state.weeklyMods[k]; saveWeek(); renderWish();
   });
   const wa=$('#wishApply');
   if(wa)wa.onclick=()=>{
     prevAnchors=planAnchorIds(state.plan);save(LS.prev,prevAnchors);
-    state.plan=generatePlan(state.weeklyMods);state.approved=false;save(LS.plan,state);
+    state.plan=generatePlan(state.weeklyMods);state.approved=false;saveWeek();
     renderAll();$('#weekwish').scrollIntoView({behavior:'smooth',block:'start'});
   };
 }
@@ -698,14 +743,14 @@ function renderLockbar(){
   }else{
     el.innerHTML=`<div class="lockbar todo"><div class="lt">📝 Review your week</div><div class="ld">Swap anything with ↻ until it's right, then lock it to build your shopping list.</div>
       <button class="btn primary lock-btn" id="lockBtn">✓ Lock week &amp; build shopping list</button></div>`;
-    $('#lockBtn').onclick=()=>{state.approved=true;save(LS.plan,state);renderLockbar();showView('shop');};
+    $('#lockBtn').onclick=()=>{state.approved=true;saveWeek();renderLockbar();showView('shop');};
   }
 }
 function renderDays(){
   const todayDow=new Date().getDay();
   $('#dayStrip').innerHTML=DOW.map((d,i)=>{
     const dt=new Date(sunday);dt.setDate(dt.getDate()+i);
-    const cls=['day'];if(i===activeDay)cls.push('active');if(i===todayDow)cls.push('today');
+    const cls=['day'];if(i===activeDay)cls.push('active');if(weekOffset===0&&i===todayDow)cls.push('today');
     return `<button class="${cls.join(' ')}" data-day="${i}"><div class="dow">${d}</div><div class="dnum">${dt.getDate()}</div><div class="pg">${dayProtein(i)}g</div></button>`;
   }).join('');
   $('#dayStrip').querySelectorAll('.day').forEach(el=>el.onclick=()=>{activeDay=+el.dataset.day;renderDays();renderMeals();el.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'});});
@@ -789,7 +834,7 @@ function openRecipe(id){
 }
 function chooseDish(meal,id){
   const seg=segForDay(state.plan[meal],activeDay);
-  seg.id=id;state.approved=false;save(LS.plan,state);
+  seg.id=id;state.approved=false;saveWeek();
 }
 function surpriseDish(meal){
   const seg=segForDay(state.plan[meal],activeDay);
@@ -850,7 +895,7 @@ function openEdit(meal){
   $('#mClose').onclick=closeModal;
   m.querySelector('.m-back').onclick=closeModal;
   m.querySelectorAll('[data-cookday]').forEach(b=>b.onclick=()=>{
-    state.cookDays[segKey(meal,seg)]=+b.dataset.cookday;save(LS.plan,state);
+    state.cookDays[segKey(meal,seg)]=+b.dataset.cookday;saveWeek();
     m.querySelectorAll('[data-cookday]').forEach(x=>x.classList.toggle('on',x===b));afterEdit();
   });
   $('#mSkip').onclick=()=>{toggleSkip(meal,activeDay);afterEdit();openEdit(meal);};
@@ -1020,7 +1065,7 @@ function renderSettings(){
 }
 $('#applyPrefs').onclick=()=>{
   prevAnchors=planAnchorIds(state.plan);save(LS.prev,prevAnchors);
-  state=freshWeek();save(LS.plan,state);
+  state=freshWeek();saveWeek();
   shopChecked={};save(LS.shop,shopChecked);
   renderAll();showView('plan');
 };
@@ -1029,7 +1074,7 @@ $('#resetPrefs').onclick=()=>{prefs=Object.assign({},DEFAULT_PREFS);savePrefs();
 /* ---------- regenerate + tabs ---------- */
 $('#regen').onclick=()=>{
   prevAnchors=planAnchorIds(state.plan);save(LS.prev,prevAnchors);
-  state=freshWeek();save(LS.plan,state);
+  state=freshWeek();saveWeek();
   shopChecked={};save(LS.shop,shopChecked);
   renderAll();$('#summary').scrollIntoView({behavior:'smooth',block:'start'});
 };
@@ -1048,6 +1093,8 @@ function showView(w){
 $('#tabPlan').onclick=()=>showView('plan');
 $('#tabShop').onclick=()=>showView('shop');
 $('#tabSet').onclick=()=>showView('set');
+$('#wkPrev').onclick=()=>{if(weekOffset>0)setWeek(weekOffset-1);};
+$('#wkNext').onclick=()=>{if(weekOffset<MAX_AHEAD)setWeek(weekOffset+1);};
 
 function renderAll(){renderChips();renderWeekLabel();renderWish();renderSummary();renderLevelup();renderDays();renderLockbar();renderMeals();updateBadge();}
 
@@ -1087,7 +1134,7 @@ function showOnboard(){
   o.querySelectorAll('[data-tog]').forEach(sw=>sw.onclick=()=>{prefs[sw.dataset.tog]=!prefs[sw.dataset.tog];savePrefs();sw.classList.toggle('on',prefs[sw.dataset.tog]);});
   $('#obStart').onclick=()=>{
     save(LS.onboarded,true);
-    state=freshWeek();save(LS.plan,state);
+    state=freshWeek();saveWeek();
     o.style.display='none'; renderAll();
   };
 }
