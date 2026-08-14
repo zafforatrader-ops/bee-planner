@@ -516,6 +516,7 @@ const DEFAULT_PREFS={
   weightKg:'', targetKg:'',
   planBreakfast:true, planLunch:true, planDinner:true,
   portion:'normal',         // light | normal | hearty
+  email:'', digestOptIn:false, digestConsent:false,
 };
 const MEALS=[['bf','🥣','Breakfast','light & health-forward'],['lunch','🍚','Lunch','matta rice + curries'],['dinner','🍗','Dinner','early 6–7pm · light']];
 function mealOn(m){return m==='bf'?prefs.planBreakfast!==false:m==='lunch'?prefs.planLunch!==false:prefs.planDinner!==false;}
@@ -996,6 +997,13 @@ function renderSettings(){
   const h=`
   <div class="scopehint">🗓️<div><b>These are your always-defaults.</b> For a one-off tweak, use the <b>“This week I want…”</b> card on the Plan tab instead.</div></div>
 
+  <div class="setgroup"><h4>📧 Sunday email digest</h4><div class="gd">Get your week + shopping list emailed every Sunday. Also becomes your sign-in, so Bee remembers you on any device.</div>
+    <div class="hin" style="margin-bottom:10px"><label>Your email</label><input type="email" inputmode="email" autocomplete="email" id="emailInput" placeholder="you@example.com" value="${(prefs.email||'').replace(/"/g,'&quot;')}"></div>
+    ${toggle('digestOptIn',!!prefs.digestOptIn,'Email me every Sunday','Weekly plan + shopping list')}
+    ${toggle('digestConsent',!!prefs.digestConsent,'I agree to receive these emails','Unsubscribe anytime · stored only to send your digest')}
+    <div class="ptarget" id="emailStatus" style="background:var(--surface-2);color:var(--muted)">Saved on this device. Weekly sending switches on once the mail service is connected.</div>
+  </div>
+
   <div class="setgroup"><h4>Household</h4><div class="gd">How many people the shopping list buys for.</div>
     <div class="stepper"><button data-hh="-1">−</button><div class="num" id="hhNum">${prefs.household}</div><button data-hh="1">+</button><span style="font-size:12px;color:var(--muted);margin-left:6px">adults</span></div></div>
 
@@ -1072,6 +1080,15 @@ function renderSettings(){
   const wk=$('#weightKg'),tk=$('#targetKg');
   if(wk)wk.onchange=()=>{prefs.weightKg=wk.value;savePrefs();renderSettings();};
   if(tk)tk.onchange=()=>{prefs.targetKg=tk.value;savePrefs();};
+  const em=$('#emailInput');
+  if(em)em.onchange=()=>{
+    const v=em.value.trim(); prefs.email=v; savePrefs();
+    const st=$('#emailStatus'); const valid=!v||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+    if(st){ st.textContent = !v ? 'Saved on this device. Weekly sending switches on once the mail service is connected.'
+      : valid ? '✓ Email saved. Weekly sending switches on once the mail service is connected.'
+      : '⚠ That doesn’t look like a valid email.';
+      st.style.color = valid?'var(--muted)':'var(--spice)'; }
+  };
 }
 $('#applyPrefs').onclick=()=>{
   prevAnchors=planAnchorIds(state.plan);save(LS.prev,prevAnchors);
