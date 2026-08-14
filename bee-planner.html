@@ -336,6 +336,7 @@ nav.tabs .tab .badge{position:absolute;transform:translate(14px,-4px);background
   <div id="modal" class="modal" style="display:none"></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ============================================================
    Bee Weekly Planner — engine "Bit"
@@ -486,7 +487,31 @@ const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 /* ---------- storage ---------- */
 const LS={ratings:'bwp_ratings_v2',plan:'bwp_plan_v2',prev:'bwp_prev_v2',shop:'bwp_shop_v2',prefs:'bwp_prefs_v2',onboarded:'bwp_onboarded_v2',weeks:'bwp_weeks_v2'};
 const load=(k,f)=>{try{return JSON.parse(localStorage.getItem(k))??f}catch(e){return f}};
-const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+let _applying=false;
+const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){} if(!_applying)scheduleSync();};
+
+/* ---------- optional cloud sync (Supabase, passwordless email login) ---------- */
+const SB_URL='https://uulqbvnlbvieepdgpwvt.supabase.co';
+const SB_KEY='sb_publishable_12nnVL7sVz5tgjeqsUz51w_05aPu5XB';
+var SB=(window.supabase&&window.supabase.createClient)?window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
+var currentUser=null, syncTimer=null;
+const escHtml=s=>String(s==null?'':s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+function appBundle(){return {weeks:load(LS.weeks,{}),prefs:load(LS.prefs,{}),ratings:load(LS.ratings,{}),shop:load(LS.shop,{}),prev:load(LS.prev,[]),onboarded:load(LS.onboarded,false)};}
+function bundleSig(b){b=b||{};return JSON.stringify([b.weeks||{},b.prefs||{},b.ratings||{},b.shop||{},b.prev||[],!!b.onboarded]);}
+function applyBundle(b){if(!b)return;_applying=true;try{
+  if(b.weeks)save(LS.weeks,b.weeks); if(b.prefs)save(LS.prefs,b.prefs);
+  if(b.ratings)save(LS.ratings,b.ratings); if(b.shop)save(LS.shop,b.shop);
+  if(b.prev)save(LS.prev,b.prev); if(b.onboarded!=null)save(LS.onboarded,b.onboarded);
+}finally{_applying=false;}}
+async function pushSync(){if(!SB||!currentUser)return;try{await SB.from('user_data').upsert({user_id:currentUser.id,email:currentUser.email,data:appBundle(),updated_at:new Date().toISOString()});}catch(e){}}
+function scheduleSync(){if(typeof SB==='undefined'||!SB||!currentUser)return;clearTimeout(syncTimer);syncTimer=setTimeout(pushSync,1500);}
+async function pullSync(){if(!SB||!currentUser)return 'none';try{
+  const r=await SB.from('user_data').select('data').eq('user_id',currentUser.id).maybeSingle();
+  if(r.error||!r.data||!r.data.data)return 'empty';
+  if(bundleSig(r.data.data)===bundleSig(appBundle()))return 'same';
+  applyBundle(r.data.data);return 'changed';
+}catch(e){return 'error';}}
+
 let ratings=load(LS.ratings,{});
 let shopChecked=load(LS.shop,{});
 let prevAnchors=load(LS.prev,[]);   // last week's anchor ids -> avoid next week
@@ -987,11 +1012,20 @@ function renderSettings(){
   const h=`
   <div class="scopehint">🗓️<div><b>These are your always-defaults.</b> For a one-off tweak, use the <b>“This week I want…”</b> card on the Plan tab instead.</div></div>
 
-  <div class="setgroup"><h4>📧 Sunday email digest</h4><div class="gd">Get your week + shopping list emailed every Sunday. Also becomes your sign-in, so Bee remembers you on any device.</div>
-    <div class="hin" style="margin-bottom:10px"><label>Your email</label><input type="email" inputmode="email" autocomplete="email" id="emailInput" placeholder="you@example.com" value="${(prefs.email||'').replace(/"/g,'&quot;')}"></div>
-    ${toggle('digestOptIn',!!prefs.digestOptIn,'Email me every Sunday','Weekly plan + shopping list')}
-    ${toggle('digestConsent',!!prefs.digestConsent,'I agree to receive these emails','Unsubscribe anytime · stored only to send your digest')}
-    <div class="ptarget" id="emailStatus" style="background:var(--surface-2);color:var(--muted)">Saved on this device. Weekly sending switches on once the mail service is connected.</div>
+  <div class="setgroup"><h4>📧 Account &amp; Sunday email</h4><div class="gd">Sign in with just your email — no password. Syncs Bee across your devices and powers the Sunday digest.</div>
+    ${ currentUser ? `
+      <div class="ptarget" style="background:var(--green-soft);color:var(--green-deep)">✓ Signed in as <b>${escHtml(currentUser.email)}</b> — your plan now syncs across your devices.</div>
+      ${toggle('digestOptIn',!!prefs.digestOptIn,'Email me every Sunday','Weekly plan + shopping list')}
+      ${toggle('digestConsent',!!prefs.digestConsent,'I agree to receive these emails','Unsubscribe anytime · stored only to send your digest')}
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn" id="signOutBtn" style="flex:1;justify-content:center">Sign out</button>
+        <button class="btn" id="deleteDataBtn" style="flex:1;justify-content:center;color:var(--spice);border-color:var(--spice)">Delete my data</button>
+      </div>` : `
+      <div class="hin" style="margin-bottom:10px"><label>Your email</label><input type="email" inputmode="email" autocomplete="email" id="emailInput" placeholder="you@example.com" value="${(prefs.email||'').replace(/"/g,'&quot;')}"></div>
+      ${toggle('digestConsent',!!prefs.digestConsent,'I agree Bee stores my email + plan (EU-hosted) to sync my devices','Unsubscribe / delete anytime')}
+      <button class="btn primary" id="loginBtn" style="width:100%;justify-content:center;margin-top:10px">📩 Email me a login link</button>
+      <div class="ptarget" id="emailStatus" style="background:var(--surface-2);color:var(--muted)">${SB?'You’ll get a one-tap login link. First time, check your spam folder.':'Sign-in isn’t available on this preview — use your bee-planner link / home-screen app.'}</div>`
+    }
   </div>
 
   <div class="setgroup"><h4>Household</h4><div class="gd">How many people the shopping list buys for.</div>
@@ -1071,14 +1105,37 @@ function renderSettings(){
   if(wk)wk.onchange=()=>{prefs.weightKg=wk.value;savePrefs();renderSettings();};
   if(tk)tk.onchange=()=>{prefs.targetKg=tk.value;savePrefs();};
   const em=$('#emailInput');
-  if(em)em.onchange=()=>{
-    const v=em.value.trim(); prefs.email=v; savePrefs();
-    const st=$('#emailStatus'); const valid=!v||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-    if(st){ st.textContent = !v ? 'Saved on this device. Weekly sending switches on once the mail service is connected.'
-      : valid ? '✓ Email saved. Weekly sending switches on once the mail service is connected.'
-      : '⚠ That doesn’t look like a valid email.';
-      st.style.color = valid?'var(--muted)':'var(--spice)'; }
+  if(em)em.onchange=()=>{ prefs.email=em.value.trim(); savePrefs(); };
+  const lb=$('#loginBtn');
+  if(lb)lb.onclick=async()=>{
+    const email=(($('#emailInput')||{}).value||'').trim(); const st=$('#emailStatus');
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){st.textContent='⚠ Enter a valid email first.';st.style.color='var(--spice)';return;}
+    if(!prefs.digestConsent){st.textContent='⚠ Please tick the consent box to sign in.';st.style.color='var(--spice)';return;}
+    prefs.email=email; savePrefs();
+    if(!SB){st.textContent='Sign-in unavailable here.';return;}
+    st.textContent='Sending…'; st.style.color='var(--muted)'; lb.disabled=true;
+    const {error}=await SB.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});
+    lb.disabled=false;
+    if(error){st.textContent='⚠ '+error.message; st.style.color='var(--spice)';}
+    else{st.innerHTML='✅ Check your inbox (<b>and spam</b>) for a login link, then tap it.'; st.style.color='var(--green-deep)';}
   };
+  const so=$('#signOutBtn');
+  if(so)so.onclick=async()=>{ try{await SB.auth.signOut();}catch(e){} location.reload(); };
+  const dd=$('#deleteDataBtn');
+  if(dd)dd.onclick=async()=>{ if(!confirm('Delete your Bee data from the cloud? (Your copy on this device stays.)'))return; try{await SB.from('user_data').delete().eq('user_id',currentUser.id);}catch(e){} try{await SB.auth.signOut();}catch(e){} location.reload(); };
+}
+/* ---------- auth bootstrap: sign-in, pull cloud data, keep in sync ---------- */
+function renderAccountUI(){ if(document.querySelector('#setView').classList.contains('active')) renderSettings(); }
+if(SB){
+  SB.auth.onAuthStateChange(async (_evt,session)=>{
+    currentUser=session?session.user:null;
+    if(currentUser){
+      const res=await pullSync();
+      if(res==='changed'){ location.reload(); return; }
+      if(res==='empty'){ pushSync(); }
+    }
+    renderAccountUI();
+  });
 }
 $('#applyPrefs').onclick=()=>{
   prevAnchors=planAnchorIds(state.plan);save(LS.prev,prevAnchors);
