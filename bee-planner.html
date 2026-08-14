@@ -253,6 +253,30 @@ nav.tabs .tab .badge{position:absolute;transform:translate(14px,-4px);background
 .ytbtn{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0 2px;padding:11px;border-radius:12px;background:#ff0000;color:#fff;font-weight:600;font-size:13.5px;text-decoration:none}
 .ytbtn:hover{background:#e60000}
 .ytbtn svg{width:20px;height:20px}
+
+/* add-dish form */
+.fld{margin:12px 0 0}
+.fld>label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);margin-bottom:6px}
+.fld input,.fld select,.fld textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);font-family:var(--font-body);font-size:14.5px}
+.fld textarea{resize:vertical;line-height:1.5}
+.frow{display:flex;gap:10px}
+.frow .fld{flex:1;min-width:0}
+.adtags{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
+.adtag{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--muted)}
+.adtag input{width:16px;height:16px}
+.mydish-list{display:flex;flex-direction:column;gap:8px}
+.mydish{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:9px 11px}
+.md-n{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.md-s{font-size:11px;color:var(--muted);margin-top:1px}
+.md-edit{padding:6px 12px;font-size:12px;flex:0 0 auto}
+.pantry-list{display:flex;flex-wrap:wrap;gap:7px}
+.pchip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:5px 6px 5px 11px;color:var(--ink)}
+.pchip button{border:none;background:var(--line);color:var(--muted);width:18px;height:18px;border-radius:50%;font-size:11px;cursor:pointer;display:grid;place-items:center;line-height:1}
+.pchip button:hover{background:var(--spice);color:#fff}
+/* shopping aisle + budget */
+.aisle{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);padding:10px 15px 4px;background:var(--surface-2)}
+.budget{display:flex;gap:9px;align-items:flex-start;background:var(--gold-soft);border:1px solid var(--line);border-radius:13px;padding:12px 14px;margin-top:14px;font-size:14px}
+.budget b{font-family:var(--font-display);font-size:18px;color:var(--gold)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 :focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
 </style>
@@ -480,12 +504,17 @@ d15:['Mix mince, egg, salt & herbs; roll into balls.','Air-fry 200°C ~12 min.',
 d16:['Brush fish with a miso-mirin glaze.','Grill or broil 8–10 min.','Steam pak choi and serve alongside.'],
 };
 
-const byId=Object.fromEntries(D.map(d=>[d.id,d]));
-const mealPool=m=>D.filter(d=>d.meal===m);
+// dish index includes user-added custom dishes (loaded below)
+let customDishes=[];
+function allD(){return D.concat(customDishes);}
+let byId={};
+function rebuildIndex(){byId=Object.fromEntries(allD().map(d=>[d.id,d]));}
+function mealPool(m){return allD().filter(d=>d.meal===m);}
+rebuildIndex();
 const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 /* ---------- storage ---------- */
-const LS={ratings:'bwp_ratings_v2',plan:'bwp_plan_v2',prev:'bwp_prev_v2',shop:'bwp_shop_v2',prefs:'bwp_prefs_v2',onboarded:'bwp_onboarded_v2',weeks:'bwp_weeks_v2'};
+const LS={ratings:'bwp_ratings_v2',plan:'bwp_plan_v2',prev:'bwp_prev_v2',shop:'bwp_shop_v2',prefs:'bwp_prefs_v2',onboarded:'bwp_onboarded_v2',weeks:'bwp_weeks_v2',custom:'bwp_custom_v2',pantry:'bwp_pantry_v2'};
 const load=(k,f)=>{try{return JSON.parse(localStorage.getItem(k))??f}catch(e){return f}};
 let _applying=false;
 const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){} if(!_applying)scheduleSync();};
@@ -496,12 +525,13 @@ const SB_KEY='sb_publishable_12nnVL7sVz5tgjeqsUz51w_05aPu5XB';
 var SB=(window.supabase&&window.supabase.createClient)?window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
 var currentUser=null, syncTimer=null;
 const escHtml=s=>String(s==null?'':s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-function appBundle(){return {weeks:load(LS.weeks,{}),prefs:load(LS.prefs,{}),ratings:load(LS.ratings,{}),shop:load(LS.shop,{}),prev:load(LS.prev,[]),onboarded:load(LS.onboarded,false)};}
-function bundleSig(b){b=b||{};return JSON.stringify([b.weeks||{},b.prefs||{},b.ratings||{},b.shop||{},b.prev||[],!!b.onboarded]);}
+function appBundle(){return {weeks:load(LS.weeks,{}),prefs:load(LS.prefs,{}),ratings:load(LS.ratings,{}),shop:load(LS.shop,{}),prev:load(LS.prev,[]),onboarded:load(LS.onboarded,false),custom:load(LS.custom,[]),pantry:load(LS.pantry,[])};}
+function bundleSig(b){b=b||{};return JSON.stringify([b.weeks||{},b.prefs||{},b.ratings||{},b.shop||{},b.prev||[],!!b.onboarded,b.custom||[],b.pantry||[]]);}
 function applyBundle(b){if(!b)return;_applying=true;try{
   if(b.weeks)save(LS.weeks,b.weeks); if(b.prefs)save(LS.prefs,b.prefs);
   if(b.ratings)save(LS.ratings,b.ratings); if(b.shop)save(LS.shop,b.shop);
   if(b.prev)save(LS.prev,b.prev); if(b.onboarded!=null)save(LS.onboarded,b.onboarded);
+  if(b.custom)save(LS.custom,b.custom); if(b.pantry)save(LS.pantry,b.pantry);
 }finally{_applying=false;}}
 async function pushSync(){if(!SB||!currentUser)return;try{await SB.from('user_data').upsert({user_id:currentUser.id,email:currentUser.email,data:appBundle(),updated_at:new Date().toISOString()});}catch(e){}}
 function scheduleSync(){if(typeof SB==='undefined'||!SB||!currentUser)return;clearTimeout(syncTimer);syncTimer=setTimeout(pushSync,1500);}
@@ -515,6 +545,9 @@ async function pullSync(){if(!SB||!currentUser)return 'none';try{
 let ratings=load(LS.ratings,{});
 let shopChecked=load(LS.shop,{});
 let prevAnchors=load(LS.prev,[]);   // last week's anchor ids -> avoid next week
+customDishes=load(LS.custom,[]); rebuildIndex();   // pull in user-added dishes
+const DEFAULT_PANTRY=['Coconut oil','Mustard seeds','Turmeric','Chilli powder','Curry leaves','Hing / asafoetida','Black pepper','Olive oil','Salt & basics'];
+let pantryItems=load(LS.pantry,null); if(pantryItems===null){pantryItems=DEFAULT_PANTRY.slice(); save(LS.pantry,pantryItems);}
 
 /* ---------- preferences (Settings = your always-defaults) ---------- */
 const DEFAULT_PREFS={
@@ -695,7 +728,7 @@ function toggleSkip(m,day){if(!state.skips)state.skips=[];const k=m+':'+day;cons
 const $=s=>document.querySelector(s);
 function segForDay(track,day){return track.find(s=>day>=s.start && day<s.start+s.len);}
 function dayProtein(day){
-  let p=0;['bf','lunch','dinner'].forEach(m=>{if(!mealOn(m)||isSkipped(m,day))return;const s=segForDay(state.plan[m],day);if(s)p+=byId[s.id].pg;});
+  let p=0;['bf','lunch','dinner'].forEach(m=>{if(!mealOn(m)||isSkipped(m,day))return;const s=segForDay(state.plan[m],day);if(s&&byId[s.id])p+=byId[s.id].pg;});
   return p;
 }
 
@@ -710,12 +743,12 @@ function renderSummary(){
   let cooks=0;const cuisSet=new Set();let meals=0;
   onMeals.forEach(m=>{
     state.plan[m].forEach(seg=>{
-      const cd=cookDayOf(m,seg);
+      const dd0=byId[seg.id]; if(!dd0)return;
       const activeDays=[];for(let dd=seg.start;dd<seg.start+seg.len;dd++)if(!isSkipped(m,dd))activeDays.push(dd);
       if(!activeDays.length)return;
-      cuisSet.add(byId[seg.id].cuis);
+      cuisSet.add(dd0.cuis);
       meals+=activeDays.length;
-      if(!(m==='bf'&&byId[seg.id].cook==='No-cook'))cooks++;
+      if(!(m==='bf'&&dd0.cook==='No-cook'))cooks++;
     });
   });
   let ptot=0,pdays=0;for(let i=0;i<7;i++){const p=dayProtein(i);ptot+=p;pdays++;}
@@ -805,7 +838,11 @@ function badges(d,day,cookDay){
 }
 function mealCard(meal,icClass,icon,title,when){
   const seg=segForDay(state.plan[meal],activeDay);
-  const d=byId[seg.id];const[cem,cnm]=CUIS[d.cuis];
+  if(!byId[seg.id]){ // dish was removed (e.g. deleted custom) — self-heal
+    const repl=pickWeighted(mealPool(meal).filter(allowed).filter(x=>x.id!==seg.id),state.weeklyMods)||mealPool(meal)[0];
+    if(repl){seg.id=repl.id;saveWeek();}
+  }
+  const d=byId[seg.id];const[cem,cnm]=CUIS[d.cuis]||['🍽️',''];
   // eating out / skipped
   if(isSkipped(meal,activeDay)){
     return `<div class="meal"><div class="meal-head"><div class="mt"><div class="meal-ic ${icClass}">${icon}</div><div><h3>${title}</h3></div></div><span class="cuis">skipped</span></div>
@@ -838,7 +875,7 @@ function renderMeals(){
 function openRecipe(id){
   const d=byId[id];if(!d)return;
   const[cem,cnm]=CUIS[d.cuis];
-  const steps=(STEPS[id]||['Simple home-style dish — cook to taste.']).map((s,i)=>`<li><span class="rn">${i+1}</span><span>${s}</span></li>`).join('');
+  const steps=(STEPS[id]||(byId[id]&&byId[id].steps&&byId[id].steps.length?byId[id].steps:null)||['Simple home-style dish — cook to taste.']).map((s,i)=>`<li><span class="rn">${i+1}</span><span>${escHtml(s)}</span></li>`).join('');
   const ings=d.ing.map(([n,q,u])=>`<li><span>${n}</span><span class="riq">${q}${u==='pc'?'':' '+u}</span></li>`).join('');
   const bd=[`<span class="bdg pro">💪 ${d.pg}g protein</span>`,`<span class="bdg light">⏱ ${d.mins} min · ${d.cook}</span>`];
   if(d.spice>0)bd.push(`<span class="bdg spice">🌶 ${SPICEW[d.spice]}</span>`);
@@ -929,6 +966,63 @@ function openEdit(meal){
   m.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{chooseDish(meal,b.dataset.pick);closeModal();afterEdit();});
 }
 
+/* ---------- add-your-own dishes ---------- */
+function newDishId(){return 'c'+Date.now().toString(36)+Math.floor(Math.random()*1000);}
+function parseIng(text){return (text||'').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
+  const p=l.split(/[;|]/).map(s=>s.trim());
+  const name=p[0]||'Item'; const qty=parseFloat(p[1])||1; const unit=p[2]||'';
+  let shop=(p[3]||'g').toLowerCase(); shop=shop.startsWith('i')?'i':shop.startsWith('p')?'p':'g';
+  return [name,qty,unit,shop];
+});}
+function ingToText(ing){return (ing||[]).map(([n,q,u,s])=>`${n}; ${q}; ${u}; ${s==='i'?'indian':'german'}`).join('\n');}
+function openAddDish(edit){
+  const d=edit||{};
+  const cuisOpts=Object.entries(CUIS).map(([k,v])=>`<option value="${k}" ${d.cuis===k?'selected':''}>${v[0]} ${v[1]}</option>`).join('');
+  const protOpts=['chicken','fish','prawns','egg','beef','plant','none'].map(p=>`<option value="${p}" ${d.prot===p?'selected':''}>${p}</option>`).join('');
+  let meal=d.meal||'dinner', spice=(d.spice==null?1:d.spice);
+  const mealSeg=[['bf','Breakfast'],['lunch','Lunch'],['dinner','Dinner']].map(([v,l])=>`<button type="button" class="${meal===v?'on':''}" data-meal="${v}">${l}</button>`).join('');
+  const spiceSeg=[[0,'None'],[1,'Mild'],[2,'Medium']].map(([v,l])=>`<button type="button" class="${spice===v?'on':''}" data-spice="${v}">${l}</button>`).join('');
+  $('#modal').innerHTML=`<div class="m-back"></div><div class="m-card"><div class="m-head"><div><div class="m-title">${edit?'Edit dish':'Add a dish'}</div><div class="m-sub">Bee will start planning it</div></div><button class="iconbtn" id="mClose">${XMARK}</button></div>
+    <div class="m-scroll">
+      <div class="fld"><label>Name</label><input id="ad-name" value="${escHtml(d.name||'')}" placeholder="e.g. Amma's beef curry"></div>
+      <div class="fld"><label>Meal</label><div class="seg" id="ad-meal">${mealSeg}</div></div>
+      <div class="frow"><div class="fld"><label>Cuisine</label><select id="ad-cuis">${cuisOpts}</select></div>
+        <div class="fld"><label>Protein</label><select id="ad-prot">${protOpts}</select></div></div>
+      <div class="frow"><div class="fld"><label>Protein g / serving</label><input id="ad-pg" type="number" inputmode="numeric" value="${d.pg==null?25:d.pg}"></div>
+        <div class="fld"><label>Time (min)</label><input id="ad-mins" type="number" inputmode="numeric" value="${d.mins==null?25:d.mins}"></div></div>
+      <div class="frow"><div class="fld"><label>Spice</label><div class="seg" id="ad-spice">${spiceSeg}</div></div>
+        <div class="fld"><label>Cook method</label><input id="ad-cook" value="${escHtml(d.cook||'Pan')}" placeholder="Grill / Air-fry / Simmer"></div></div>
+      <div class="fld"><label>Short description</label><input id="ad-sub" value="${escHtml(d.sub||'')}" placeholder="e.g. coconut, curry leaf"></div>
+      <div class="fld"><label>Ingredients — one per line: <span style="color:var(--faint)">name; qty; unit; shop</span></label>
+        <textarea id="ad-ing" rows="5" placeholder="Chicken; 500; g; german&#10;Coconut milk; 200; ml; indian">${escHtml(ingToText(d.ing))}</textarea></div>
+      <div class="fld"><label>Steps — one per line (optional)</label><textarea id="ad-steps" rows="4" placeholder="Marinate the chicken.&#10;Grill 4 min per side.">${escHtml((d.steps||[]).join('\n'))}</textarea></div>
+      <div class="adtags">
+        <label class="adtag"><input type="checkbox" id="ad-gut" ${d.gut?'checked':''}> 🌿 gut-friendly</label>
+        <label class="adtag"><input type="checkbox" id="ad-light" ${d.light!==false?'checked':''}> 🪶 lighter</label>
+        <label class="adtag"><input type="checkbox" id="ad-lf" ${d.lf?'checked':''}> LF curd</label></div>
+      <button class="btn primary" id="ad-save" style="width:100%;justify-content:center;padding:13px;margin-top:6px">${edit?'Save changes':'Add dish'}</button>
+      ${edit?`<button class="btn" id="ad-del" style="width:100%;justify-content:center;margin-top:8px;color:var(--spice);border-color:var(--spice)">Delete dish</button>`:''}
+      <div class="m-d" id="ad-msg" style="margin-top:8px"></div>
+    </div></div>`;
+  const m=$('#modal'); m.style.display='block';
+  $('#mClose').onclick=closeModal; m.querySelector('.m-back').onclick=closeModal;
+  m.querySelectorAll('#ad-meal [data-meal]').forEach(b=>b.onclick=()=>{meal=b.dataset.meal;m.querySelectorAll('#ad-meal button').forEach(x=>x.classList.toggle('on',x===b));});
+  m.querySelectorAll('#ad-spice [data-spice]').forEach(b=>b.onclick=()=>{spice=+b.dataset.spice;m.querySelectorAll('#ad-spice button').forEach(x=>x.classList.toggle('on',x===b));});
+  $('#ad-save').onclick=()=>{
+    const name=($('#ad-name').value||'').trim(); const msg=$('#ad-msg');
+    if(!name){msg.textContent='⚠ Give it a name.';msg.style.color='var(--spice)';return;}
+    const ing=parseIng($('#ad-ing').value);
+    if(!ing.length){msg.textContent='⚠ Add at least one ingredient.';msg.style.color='var(--spice)';return;}
+    const steps=($('#ad-steps').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+    const dish={id:edit?d.id:newDishId(),name,sub:($('#ad-sub').value||'').trim()||'your recipe',cuis:$('#ad-cuis').value,meal,prot:$('#ad-prot').value,
+      pg:Math.max(0,parseInt($('#ad-pg').value)||20),spice,mins:Math.max(1,parseInt($('#ad-mins').value)||25),cook:($('#ad-cook').value||'Pan').trim(),
+      batch:true,gf:true,gut:$('#ad-gut').checked,light:$('#ad-light').checked,lf:$('#ad-lf').checked,ing,steps,custom:true};
+    if(edit){const i=customDishes.findIndex(x=>x.id===d.id);if(i>=0)customDishes[i]=dish;} else customDishes.push(dish);
+    save(LS.custom,customDishes); rebuildIndex(); closeModal(); renderSettings();
+  };
+  const del=$('#ad-del'); if(del)del.onclick=()=>{ if(!confirm('Delete this dish?'))return; customDishes=customDishes.filter(x=>x.id!==d.id); save(LS.custom,customDishes); rebuildIndex(); closeModal(); renderSettings(); };
+}
+
 /* ---------- shopping ---------- */
 function storeMeta(){
   const shop=prefs.preferredShop||'REWE';
@@ -940,57 +1034,89 @@ function storeMeta(){
     p:{ic:'🫙',name:'Pantry check',sub:'staples you likely already have'},
   };
 }
-const PANTRY=[['Coconut oil'],['Mustard seeds'],['Turmeric'],['Chilli powder (go easy)'],['Curry leaves'],['Hing / asafoetida'],['Black pepper'],['Olive oil'],['Garlic-infused oil (gut-friendly)'],['Salt & basics']];
 function unitRound(q,u){if(u==='g'||u==='ml')return Math.round(q/25)*25;if(u==='pc'||u==='sl')return Math.ceil(q);return Math.round(q*10)/10;}
 function buildShopping(){
   const agg={};
   const portionMult=prefs.portion==='light'?0.85:prefs.portion==='hearty'?1.2:1;
   const hh=(prefs.household||2)/2*portionMult;   // ingredients sized for 2
-  // resolve per day so skips + disabled meals are honoured
   ['bf','lunch','dinner'].forEach(m=>{
     if(!mealOn(m))return;
     for(let day=0;day<7;day++){
       if(isSkipped(m,day))continue;
       const seg=segForDay(state.plan[m],day);if(!seg)continue;
-      byId[seg.id].ing.forEach(([name,qty,unit,store])=>{
+      const d=byId[seg.id]; if(!d||!d.ing)continue;
+      d.ing.forEach(([name,qty,unit,store])=>{
         const key=store+'|'+name+'|'+unit;
         if(!agg[key])agg[key]={name,qty:0,unit,store};
         agg[key].qty+=qty*hh;
       });
     }
   });
-  const groups={g:[],i:[],p:[]};
-  Object.values(agg).forEach(it=>groups[it.store]?.push(it));
-  PANTRY.forEach(([name])=>groups.p.push({name,qty:0,unit:'',store:'p',fixed:true}));
-  Object.values(groups).forEach(g=>g.sort((a,b)=>a.name.localeCompare(b.name)));
+  const groups={g:[],i:[]};
+  Object.values(agg).forEach(it=>{ if(groups[it.store])groups[it.store].push(it); });
   return groups;
 }
+// pantry match: an item you already own is skipped from the buy list
+function inPantry(name){const n=(name||'').toLowerCase();return (pantryItems||[]).some(p=>{p=(p||'').toLowerCase().trim();return p.length>2 && (n.includes(p)||p.includes(n));});}
+// which supermarket aisle
+function aisleOf(name){const n=(name||'').toLowerCase();
+  if(/chicken|beef|fish|salmon|prawn|mackerel|cod|mince|steak|\bmeat\b|tofu/.test(n)) return 'Meat, fish & tofu';
+  if(/egg|yogurt|milk|cream|butter|feta|paneer/.test(n)) return 'Dairy & eggs';
+  if(/bread|tortilla|oats|\brice\b|noodle|pasta|flour/.test(n)) return 'Bakery & grains';
+  if(/tomato|onion|garlic|ginger|chilli|chili|spinach|cabbage|carrot|bean|pepper|zucchini|potato|lemon|lime|avocado|banana|apple|berr|broccoli|caulif|cucumber|herb|basil|mango|pumpkin|green|salad|lettuce|chayote|beet|shallot|sweet potato|pak choi|edamame|\bpea|fruit|coriander|mint|drumstick|gourd|leaf/.test(n)) return 'Produce';
+  return 'Other';
+}
+// very rough price estimate (€)
+function priceOf(it){const n=(it.name||'').toLowerCase(),q=it.qty,u=it.unit; const per=(g)=> (u==='g'||u==='ml')?q/100*g:q*g;
+  if(/chicken|beef|fish|salmon|prawn|mackerel|cod|mince|steak|\bmeat\b/.test(n)) return (u==='g'?q/100*1.1:q*2.5);
+  if(/egg/.test(n)) return q*0.3;
+  if(/yogurt|milk|cream|butter|tofu|tahini|pesto|miso|paneer/.test(n)) return per(0.4);
+  if(/rice|oats|noodle|pasta|flour|dal|lentil|bean|chickpea/.test(n)) return per(0.3);
+  if(/bread|tortilla/.test(n)) return (u==='sl')?q*0.15:q*1.5;
+  if(/coconut|spice|tamarind|tamari|sauce|paste|seed|\bnut|masala|kudampuli/.test(n)) return 1.2;
+  return (u==='pc')?q*0.5:per(0.3);
+}
+function shoppingModel(){
+  const g=buildShopping(); const buy={g:[],i:[]}, have=[]; let total=0,count=0;
+  ['g','i'].forEach(s=>g[s].forEach(it=>{ if(inPantry(it.name)){have.push(it);} else {buy[s].push(it); total+=priceOf(it); count++;} }));
+  return {buy,have,total:Math.round(total),count};
+}
+function shopItemRow(it){
+  const key=it.store+'|'+it.name+'|'+it.unit; const done=shopChecked[key]?' done':'';
+  const note=it.name.toLowerCase().includes('lactose-free')?'lactose-free':it.name.toLowerCase().includes('gluten-free')?'gluten-free':'';
+  const qtyTxt=`${unitRound(it.qty,it.unit)} ${it.unit==='pc'?'':it.unit}`.trim();
+  return `<div class="item${done}" data-key="${key.replace(/"/g,'')}">
+    <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+    <div class="iname">${escHtml(it.name)}${note?`<span class="note">use ${note}</span>`:''}</div>
+    <div class="qty">${qtyTxt}</div></div>`;
+}
+const AISLES=['Produce','Meat, fish & tofu','Dairy & eggs','Bakery & grains','Other'];
 function renderShopping(){
-  const groups=buildShopping();
-  const SM=storeMeta();
-  $('#shopHost').innerHTML=['g','i','p'].map(s=>{
-    const items=groups[s];if(!items.length)return'';
-    const m=SM[s];
-    const rows=items.map(it=>{
-      const key=it.store+'|'+it.name+'|'+it.unit;const done=shopChecked[key]?' done':'';
-      const note=it.name.toLowerCase().includes('lactose-free')?'lactose-free':it.name.toLowerCase().includes('gluten-free')?'gluten-free':'';
-      const qtyTxt=it.fixed?'':`${unitRound(it.qty,it.unit)} ${it.unit==='pc'?'':it.unit}`.trim();
-      return `<div class="item${done}" data-key="${key.replace(/"/g,'')}">
-        <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
-        <div class="iname">${it.name}${note?`<span class="note">use ${note}</span>`:''}</div>
-        <div class="qty">${qtyTxt}</div></div>`;
-    }).join('');
-    return `<div class="store"><div class="store-head ${s}"><div class="si">${m.ic}</div><div><h3>${m.name}</h3><div class="cnt">${m.sub}</div></div></div>${rows}</div>`;
-  }).join('');
-  $('#shopHost').querySelectorAll('.item').forEach(el=>el.onclick=()=>{
+  const M=shoppingModel(); const SM=storeMeta(); let html='';
+  html+=`<div class="budget">🧮<div><b>≈ €${M.total}</b> · ${M.count} to buy${M.have.length?` · <span style="color:var(--green-deep)">${M.have.length} already in pantry</span>`:''}<div style="font-size:10.5px;color:var(--faint);margin-top:2px">rough estimate — actual prices vary</div></div></div>`;
+  if(M.buy.g.length){
+    let inner='';
+    AISLES.forEach(a=>{ const items=M.buy.g.filter(it=>aisleOf(it.name)===a).sort((x,y)=>x.name.localeCompare(y.name)); if(items.length){ inner+=`<div class="aisle">${a}</div>`+items.map(shopItemRow).join(''); } });
+    html+=`<div class="store"><div class="store-head g"><div class="si">${SM.g.ic}</div><div><h3>${SM.g.name}</h3><div class="cnt">sorted by aisle</div></div></div>${inner}</div>`;
+  }
+  if(M.buy.i.length){
+    html+=`<div class="store"><div class="store-head i"><div class="si">${SM.i.ic}</div><div><h3>${SM.i.name}</h3><div class="cnt">${SM.i.sub}</div></div></div>${M.buy.i.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(shopItemRow).join('')}</div>`;
+  }
+  if(M.have.length){
+    html+=`<div class="store"><div class="store-head p"><div class="si">🫙</div><div><h3>Already in your pantry</h3><div class="cnt">skipped from the buy list — edit in Settings</div></div></div>`+
+      M.have.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(it=>`<div class="item done" style="cursor:default"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div><div class="iname">${escHtml(it.name)}</div></div>`).join('')+`</div>`;
+  }
+  if(!M.buy.g.length && !M.buy.i.length) html+=`<div class="foot" style="padding-top:24px">Nothing to buy — you have it all! 🎉</div>`;
+  $('#shopHost').innerHTML=html;
+  $('#shopHost').querySelectorAll('.item[data-key]').forEach(el=>el.onclick=()=>{
     const k=el.dataset.key;if(shopChecked[k])delete shopChecked[k];else shopChecked[k]=true;
     save(LS.shop,shopChecked);el.classList.toggle('done');updateBadge();
   });
   updateBadge();
 }
 function updateBadge(){
-  const g=buildShopping();let total=0,done=0;
-  ['g','i'].forEach(s=>g[s].forEach(it=>{total++;if(shopChecked[it.store+'|'+it.name+'|'+it.unit])done++;}));
+  const M=shoppingModel();let total=0,done=0;
+  ['g','i'].forEach(s=>M.buy[s].forEach(it=>{total++;if(shopChecked[it.store+'|'+it.name+'|'+it.unit])done++;}));
   const b=$('#shopBadge');const rem=total-done;
   if(rem>0){b.style.display='grid';b.textContent=rem;}else b.style.display='none';
 }
@@ -1065,6 +1191,14 @@ function renderSettings(){
   <div class="setgroup"><h4>Preferred shop</h4><div class="gd">Where your shopping list points you.</div>
     ${seg('preferredShop',prefs.preferredShop,[['REWE','REWE'],['Edeka','Edeka'],['Aldi/Lidl','Aldi/Lidl'],['Any','Any']])}</div>
 
+  <div class="setgroup"><h4>🍳 My dishes</h4><div class="gd">Add your own recipes — Bee plans them alongside the built-in ones.</div>
+    ${customDishes.length?`<div class="mydish-list">${customDishes.map(d=>`<div class="mydish"><div style="min-width:0"><div class="md-n">${escHtml(d.name)}</div><div class="md-s">${CUIS[d.cuis]?CUIS[d.cuis][0]+' '+CUIS[d.cuis][1]:''} · ${d.meal==='bf'?'Breakfast':d.meal==='lunch'?'Lunch':'Dinner'} · 💪${d.pg}g</div></div><button class="btn md-edit" data-editdish="${d.id}">Edit</button></div>`).join('')}</div>`:'<div class="m-d" style="margin-bottom:2px">No custom dishes yet — add your favourites.</div>'}
+    <button class="btn primary" id="addDishBtn" style="width:100%;justify-content:center;margin-top:10px">＋ Add a dish</button></div>
+
+  <div class="setgroup"><h4>🫙 My pantry</h4><div class="gd">Staples you already keep at home — these get skipped from the shopping list.</div>
+    <div class="pantry-list" id="pantryList">${(pantryItems||[]).map((p,i)=>`<span class="pchip">${escHtml(p)}<button data-panrm="${i}" aria-label="remove">✕</button></span>`).join('')||'<span class="m-d">Pantry is empty.</span>'}</div>
+    <div style="display:flex;gap:8px;margin-top:10px"><input id="pantryInput" placeholder="Add a staple (e.g. Olive oil)" style="flex:1;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);font-family:var(--font-body);font-size:14px"><button class="btn" id="pantryAdd">Add</button></div></div>
+
   <div class="setgroup"><h4>Dietary needs</h4><div class="gd">Your baseline — respected every week.</div>
     ${toggle('lactoseFree',prefs.lactoseFree,'Lactose-free','Curd/yogurt marked lactose-free')}
     ${toggle('glutenLight',prefs.glutenLight,'Gluten-light','Avoid wheat; rice &amp; GF instead')}
@@ -1123,6 +1257,15 @@ function renderSettings(){
   if(so)so.onclick=async()=>{ try{await SB.auth.signOut();}catch(e){} location.reload(); };
   const dd=$('#deleteDataBtn');
   if(dd)dd.onclick=async()=>{ if(!confirm('Delete your Bee data from the cloud? (Your copy on this device stays.)'))return; try{await SB.from('user_data').delete().eq('user_id',currentUser.id);}catch(e){} try{await SB.auth.signOut();}catch(e){} location.reload(); };
+  // my dishes
+  const adb=$('#addDishBtn'); if(adb)adb.onclick=()=>openAddDish(null);
+  $('#setHost').querySelectorAll('[data-editdish]').forEach(b=>b.onclick=()=>openAddDish(byId[b.dataset.editdish]));
+  // my pantry
+  const pAdd=$('#pantryAdd'), pIn=$('#pantryInput');
+  const addPantry=()=>{ const v=(pIn.value||'').trim(); if(!v)return; if(!pantryItems.some(p=>p.toLowerCase()===v.toLowerCase()))pantryItems.push(v); save(LS.pantry,pantryItems); renderSettings(); };
+  if(pAdd)pAdd.onclick=addPantry;
+  if(pIn)pIn.onkeydown=(e)=>{ if(e.key==='Enter')addPantry(); };
+  $('#setHost').querySelectorAll('[data-panrm]').forEach(b=>b.onclick=()=>{ pantryItems.splice(+b.dataset.panrm,1); save(LS.pantry,pantryItems); renderSettings(); });
 }
 /* ---------- auth bootstrap: sign-in, pull cloud data, keep in sync ---------- */
 function renderAccountUI(){ if(document.querySelector('#setView').classList.contains('active')) renderSettings(); }
