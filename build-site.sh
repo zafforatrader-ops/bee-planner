@@ -1,8 +1,10 @@
 #!/bin/bash
-# Assembles a deploy-ready static site in ./site from bee-planner.html + PWA files.
+# Assembles the deployable static site into ./docs (served by GitHub Pages)
+# from bee-planner.html + the PWA files.
 set -e
 cd "$(dirname "$0")"
-mkdir -p site
+OUT=docs
+mkdir -p "$OUT"
 
 HEAD='<!doctype html>
 <html lang="en">
@@ -19,16 +21,15 @@ FOOT='<script>if("serviceWorker" in navigator){window.addEventListener("load",fu
 </body>
 </html>'
 
-printf '%s\n' "$HEAD" > site/index.html
-cat bee-planner.html >> site/index.html
-printf '%s\n' "$FOOT" >> site/index.html
+printf '%s\n' "$HEAD" > "$OUT/index.html"
+cat bee-planner.html >> "$OUT/index.html"
+printf '%s\n' "$FOOT" >> "$OUT/index.html"
 
-cp manifest.webmanifest sw.js icon.svg site/
+cp manifest.webmanifest sw.js icon.svg "$OUT"/
+touch "$OUT/.nojekyll"   # tell GitHub Pages to serve files as-is (no Jekyll)
 
-# zip for easy drag-and-drop upload (best effort)
 if command -v zip >/dev/null 2>&1; then
-  (cd site && zip -qr ../bee-site.zip .)
-  echo "Zipped -> bee-site.zip"
+  (cd "$OUT" && zip -qr ../bee-site.zip .)
 fi
 
-echo "Built site/ ($(wc -c < site/index.html | tr -d ' ') bytes) with: index.html, manifest.webmanifest, sw.js, icon.svg"
+echo "Built $OUT/ ($(wc -c < "$OUT/index.html" | tr -d ' ') bytes) -> served at GitHub Pages"
