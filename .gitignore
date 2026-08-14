@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Bot runtime state (per-chat data — never commit)
+bee-state.json
+
+# Secrets & environment (API keys go here, NEVER in git)
+.env
+.env.*
+*.key
+secrets.*
+
+# Redundant build zip (site/ is kept so Netlify can publish it directly)
+bee-site.zip
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
