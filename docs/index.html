@@ -884,7 +884,8 @@ function renderMeals(){
 }
 function openRecipe(id){
   const d=byId[id];if(!d)return;
-  const[cem,cnm]=CUIS[d.cuis];
+  const[cem,cnm]=CUIS[d.cuis]||['🍽️',''];
+  const useCh=(d.cuis==='kerala'||d.cuis==='indian');   // Shaan Geo for Kerala/Indian; generic YouTube otherwise
   const steps=(STEPS[id]||(byId[id]&&byId[id].steps&&byId[id].steps.length?byId[id].steps:null)||['Simple home-style dish — cook to taste.']).map((s,i)=>`<li><span class="rn">${i+1}</span><span>${escHtml(s)}</span></li>`).join('');
   const ings=d.ing.map(([n,q,u])=>`<li><span>${n}</span><span class="riq">${q}${u==='pc'?'':' '+u}</span></li>`).join('');
   const bd=[`<span class="bdg pro">💪 ${d.pg}g protein</span>`,`<span class="bdg light">⏱ ${d.mins} min · ${d.cook}</span>`];
@@ -895,9 +896,9 @@ function openRecipe(id){
     <div class="m-head"><div><div class="m-title">${d.name}</div><div class="m-sub">${cem} ${cnm} · ${d.sub}</div></div><button class="iconbtn" id="mClose">${XMARK}</button></div>
     <div class="m-scroll">
       <div class="badges" style="margin:10px 0 4px">${bd.join('')}</div>
-      <a class="ytbtn" href="https://www.youtube.com/results?search_query=${encodeURIComponent((YT_CHANNEL?YT_CHANNEL+' ':'')+d.name.split(' + ')[0]+' recipe')}" target="_blank" rel="noopener">
+      <a class="ytbtn" href="https://www.youtube.com/results?search_query=${encodeURIComponent((useCh?YT_CHANNEL+' ':'')+d.name.split(' + ')[0]+' recipe')}" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8ZM9.6 15.6V8.4l6.3 3.6-6.3 3.6Z"/></svg>
-        Watch how to cook it${YT_CHANNEL?` · ${YT_CHANNEL}`:''}</a>
+        Watch how to cook it${useCh?` · ${YT_CHANNEL}`:''}</a>
       <div class="m-sec"><div class="m-l">Ingredients · for 2</div><ul class="ring">${ings}</ul></div>
       <div class="m-sec"><div class="m-l">Method</div><ol class="rsteps">${steps}</ol></div>
       <div class="m-sec"><div class="m-d">💡 Batch tip: this scales well — cook once for the whole run and reheat. Quantities in your shopping list already account for that.</div></div>
